@@ -1,0 +1,280 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+#importando a tabela bootcamp_train.csv
+from google.colab import files
+uploaded = files.upload()
+
+#criando o dataframe a partir da tabela csv
+df = pd.read_csv('bootcamp_train.csv', encoding='utf-8', delimiter=',')
+
+#visualização inicial (posso mostrar as primeiras linhas da tabela e analisar como estão os dados
+print("10 Primeiras linhas:")
+print(df.head(10))
+
+print("\nResumo estatístico:")
+print(df.describe(include='all'))
+
+print("\nInformações sobre os tipos de dados e valores nulos:")
+df.info()
+
+#identificar colunas numéricas e categóricas
+numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+categorical_cols = df.select_dtypes(include=['object', 'bool']).columns
+
+#preencher valores ausentes:
+# - Numéricos: Preencher com a média
+# - Categóricos: Preencher com a moda (valor mais frequente)
+df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].mean())
+df[categorical_cols] = df[categorical_cols].fillna(df[categorical_cols].mode().iloc[0])
+
+#remover colunas totalmente vazias (se houver)
+df.dropna(axis=1, how='all', inplace=True)
+
+#verificar colunas não numéricas restantes
+non_numeric = df.select_dtypes(include=['object', 'bool']).columns
+print("Colunas não numéricas restantes:", non_numeric.tolist())
+
+#
+for col in non_numeric:
+    if df[col].dtype == 'bool' or df[col].isin(['Sim', 'Nao', 'sim', 'nao']).any():
+        df[col] = df[col].replace({'Sim': 1, 'sim': 1, 'Nao': 0, 'nao': 0}).astype(int)
+
+#fazendo um mapa de calor pra verificar a correlação dos dados
+corr_matrix = df.corr()
+plt.figure(figsize=(36, 30))
+sns.heatmap(corr_matrix, annot=True, cmap='coolwarm')
+plt.title("Matriz de Correlação")
+plt.show()
+
+
+#fazendo os graficos de distribuição
+# Distribuição de variáveis numéricas
+df.hist(figsize=(20, 15), bins=20)
+plt.tight_layout()
+plt.show()
+
+#análise de variáveis categóricas (posso fazer essa análise para todas a falhas pra verificar se são TRUE or FALSE)
+sns.countplot(x='falha_1', data=df)
+plt.title("Distribuição da Falha 1")
+plt.show()
+
+from scipy.stats import ttest_ind
+
+#separar os grupos de falha
+grupo_falha = df[df['falha_outros'] == 1]['espessura_da_chapa_de_aco']
+grupo_ok = df[df['falha_outros'] == 0]['espessura_da_chapa_de_aco']
+
+#aplicar o t-test
+t_stat, p_val = ttest_ind(grupo_falha, grupo_ok, equal_var=False)
+print(f"T-stat: {t_stat:.2f}, p-valor: {p_val:.7f}")
+
+from scipy.stats import ttest_ind
+
+#estou definindo variáveis contínuas para testar
+variaveis_continuas = [
+    'espessura_da_chapa_de_aco',
+    'temperatura',
+    'peso_da_placa',
+    'area_pixels',
+    'soma_da_luminosidade',
+    'perimetro_x',
+    'perimetro_y',
+    'index_de_bordas',
+    'index_vazio',
+    'index_quadrado'
+]
+
+#(colunas de falha)
+colunas_falha = ['falha_1', 'falha_2', 'falha_3', 'falha_4', 'falha_5', 'falha_6', 'falha_outros']
+
+#resultados dos testes
+resultados = []
+
+for falha in colunas_falha:
+    for var in variaveis_continuas:
+        grupo_falha = df[df[falha] == 1][var]
+        grupo_ok = df[df[falha] == 0][var]
+        
+        #verifica se há dados suficientes para o teste
+        if len(grupo_falha) > 10 and len(grupo_ok) > 10:
+            t_stat, p_val = ttest_ind(grupo_falha, grupo_ok, equal_var=False)
+            resultados.append({
+                'Falha': falha,
+                'Variável': var,
+                'T-stat': round(t_stat, 2),
+                'p-valor': round(p_val, 5),
+                'Significativo': 'Sim' if p_val < 0.05 else 'Não'
+            })
+
+#converter pem dataFrame
+df_resultados = pd.DataFrame(resultados)
+
+#mostrar apenas os resultados significativos
+df_significativos = df_resultados[df_resultados['Significativo'] == 'Sim'].sort_values(by='p-valor')
+
+# Visualizar
+display(df_significativos)
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+import numpy as np
+
+#dados para formato de matriz
+pivot = df_significativos.pivot(index='Falha', columns='Variável', values='p-valor')
+
+#transformar os p-valores para -log10 para facilitar leitura de significância
+pivot_log = -np.log10(pivot)
+
+#plotar heatmap
+plt.figure(figsize=(14, 6))
+sns.heatmap(pivot_log, annot=True, cmap='Reds', fmt=".2f", linewidths=.5, cbar_kws={'label': '-log10(p-valor)'})
+plt.title("Significância dos Testes de Hipótese: Falha × Variável")
+plt.xlabel("Variável Contínua")
+plt.ylabel("Tipo de Falha")
+plt.tight_layout()
+plt.show()
+
+#modelo de classificação (exemplo: RandomForest)
+from sklearn.ensemble import RandomForestClassifier
+model = RandomForestClassifier(n_estimators=100, random_state=42)
+model.fit(X_train_scaled, y_train)
+
+#avaliação
+from sklearn.metrics import accuracy_score, confusion_matrix
+y_pred = model.predict(X_test_scaled)
+print(f"Acurácia: {accuracy_score(y_test, y_pred):.2f}")
+print("Matriz de Confusão:")
+print(confusion_matrix(y_test, y_pred))
+
+#exportando os dados
+df.to_csv('dados_processados.csv', index=False)
+print("Dados processados salvos em 'dados_processados.csv'")
+
+#gerando um relatorio
+!pip install ydata-profiling  # Instalar o pacote
+from ydata_profiling import ProfileReport
+
+#criando o relatório
+profile = ProfileReport(
+    df,
+    title="Relatório de Análise Exploratória - Bootcamp Train",
+    explorative=True,
+    # dark_mode=True  # This line removed
+)
+
+#salvar o relatório em HTML
+profile.to_file("relatorio_analise.html")
+
+#visualizar no notebook
+profile.to_notebook_iframe()
+
+#conectando o github ao colab
+!git clone https://github.com/araucaceas/Bootcamp_CDIA.git
+%cd Bootcamp_CDIA
+
+#aqui eu tentei fazer a conexão do colab com o git hub com meus dados particulares e o token gerado
+!git config --global user.email "email"
+!git config --global user.name "name"
+
+#consegui conectar os dois e replicar os dados do colab no github mas como ultrapassou 50Mb não consigo abrir diretamente o cod aqui.
+
+#verifiquei o estado atual da conexao
+!git status
+
+#corrija o URL remoto 
+from getpass import getpass
+token = getpass('token GitHub:')
+
+#formato do URL:
+!git remote set-url origin https://{token}@github.com/araucaceas/Bootcamp_CDIA.git
+# token
+!git push origin main
+
+#importando bibliotecas para teste do cod
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.metrics import classification_report, hamming_loss
+from sklearn.preprocessing import StandardScaler
+
+#selecionar apenas as colunas necessárias para a análise
+target_cols = ['falha_1', 'falha_2', 'falha_3', 'falha_4', 'falha_5', 'falha_6', 'falha_outros']
+
+# X = todas as colunas exceto as de falha
+X = df.drop(columns=target_cols + ['id'])
+
+# y = rótulos (multirrótulo)
+y = df[target_cols]
+
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42, stratify=y[target_cols].sum(axis=1) > 0
+)
+
+#gerando dados para testar
+rf = RandomForestClassifier(n_estimators=100, random_state=42)
+multi_rf = MultiOutputClassifier(rf)
+multi_rf.fit(X_train, y_train)
+
+#gerando relatorio de classificação 
+y_pred = multi_rf.predict(X_test)
+print("Relatório de classificação (multirrótulo):")
+print(classification_report(y_test, y_pred, target_names=target_cols))
+print("Hamming Loss:", hamming_loss(y_test, y_pred))
+
+#enviando o arquivo do test para verificar o cod
+from google.colab import files
+uploaded = files.upload()
+
+#aqui eu corrigi alguns erros do cabeçalho
+#corrigir nomes para padronizar: sem acento, tudo minúsculo, _ no lugar de espaço
+def padroniza_colunas(df):
+    df.columns = (
+        df.columns.str.lower()
+        .str.replace('ã', 'a')
+        .str.replace('á', 'a')
+        .str.replace('â', 'a')
+        .str.replace('é', 'e')
+        .str.replace('ê', 'e')
+        .str.replace('í', 'i')
+        .str.replace('ó', 'o')
+        .str.replace('ô', 'o')
+        .str.replace('ú', 'u')
+        .str.replace('ç', 'c')
+        .str.replace(' ', '_')
+        .str.replace('-', '_')
+    )
+    return df
+
+# Aplicar no df_test
+df_test = padroniza_colunas(df_test)
+
+# Selecionar as mesmas colunas usadas em X
+X_submission = df_test[X.columns]
+X_submission_scaled = scaler.transform(X_submission)
+
+#lendo a planilha de teste e criando um arquivo para ser analisado no API fornecido
+#Padronizar colunas do test para bater com o treino
+df_test = padroniza_colunas(df_test)
+
+#Pegar features do teste (mesmas do treino)
+X_submission = df_test[X.columns]
+X_submission_scaled = scaler.transform(X_submission)
+
+#Predizer probabilidades
+y_submission_pred = multi_rf.predict_proba(X_submission_scaled)
+
+#Converter para DataFrame
+submission_probs = pd.DataFrame(
+    {target_cols[i]: y_submission_pred[i][:, 1] for i in range(len(target_cols))},
+    index=df_test['id']
+)
+
+submission_probs.reset_index(inplace=True)
+submission_probs.to_csv("submissao_defeitos.csv", index=False)
+print("Arquivo de submissão criado com sucesso!")
