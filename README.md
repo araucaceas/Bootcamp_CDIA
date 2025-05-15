@@ -1,12 +1,12 @@
 
-# Dashboard de Detecção de Falhas - Bootcamp CDIA
+# Dashboard de Detecção de Falhas - Bootcamp CDIA - Mauricio Pinheiro
 
 Este projeto apresenta um painel interativo desenvolvido com Streamlit, mostrando os resultados de um modelo de classificação multi-rótulo aplicado à detecção de falhas em chapas de aço inoxidável.
 
-## 📊 Objetivo
+## Objetivo
 Detectar até 7 categorias de falhas com base em dados como espessura, temperatura e peso das chapas.
 
-## ▶️ Como rodar
+## Como rodar
 
 1. Clone o repositório:
 ```bash
@@ -24,7 +24,7 @@ pip install -r requirements.txt
 streamlit run dashboard.py
 ```
 
-## 📁 Arquivos
+## Arquivos
 
 - `dashboard.py`: script principal do app
 - `metricas_por_classe.csv`: dados com métricas de desempenho por classe
